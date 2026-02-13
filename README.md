@@ -2,6 +2,8 @@
 
 Kodi add-on that shows a skip button during TV show intros.
 
+If you find this useful, [buy me a coffee](https://ko-fi.com/mikesilvo) ☕
+
 Works with [Skiptro](https://github.com/MikeSiLVO/skiptro-releases), which scans your library and creates `.skiptro.json` files with intro timing data.
 
 ## Installation
