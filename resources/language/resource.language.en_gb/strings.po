@@ -25,6 +25,10 @@ msgctxt "#32002"
 msgid "Auto-close dialog after (seconds)"
 msgstr ""
 
+msgctxt "#32003"
+msgid "Automatically skip intros"
+msgstr ""
+
 # Dialog buttons
 msgctxt "#32010"
 msgid "Skip Intro"
