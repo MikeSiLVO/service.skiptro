@@ -38,12 +38,12 @@ def clear_all_properties():
         clear_property(name)
 
 
-_skiptro_seeking = False
+_skiptro_seek_state = None  # None -> 'pending' -> 'settling' -> None
 
 
 def seek_with_property(player, target):
-    global _skiptro_seeking
-    _skiptro_seeking = True
+    global _skiptro_seek_state
+    _skiptro_seek_state = 'pending'
     set_property('Skipping')
     player.seekTime(target)
 
@@ -183,10 +183,9 @@ class SkiptroPlayer(xbmc.Player):
         self._load_skiptro_data()
 
     def onPlayBackSeek(self, time, seekOffset):  # noqa: N802,ARG002
-        global _skiptro_seeking
-        if _skiptro_seeking:
-            _skiptro_seeking = False
-            clear_property('Skipping')
+        global _skiptro_seek_state
+        if _skiptro_seek_state == 'pending':
+            _skiptro_seek_state = 'settling'
 
     def onPlayBackStopped(self):
         self._reset()
@@ -195,7 +194,9 @@ class SkiptroPlayer(xbmc.Player):
         self._reset()
 
     def _reset(self):
+        global _skiptro_seek_state
         log('Playback ended, resetting state')
+        _skiptro_seek_state = None
         self.skiptro_data = None
         self.current_file = None
         clear_all_properties()
@@ -289,6 +290,14 @@ class SkiptroService:
         self.player = SkiptroPlayer()
         self.active_ranges = set()
         self.prompted_ranges = set()
+        self.auto_skipped_ranges = set()
+
+    def _check_seeking_settled(self):
+        global _skiptro_seek_state
+        if _skiptro_seek_state == 'settling' and not xbmc.getCondVisibility(
+                'Player.HasPerformedSeek(2) | Player.Caching'):
+            _skiptro_seek_state = None
+            clear_property('Skipping')
 
     def run(self):
         log('Service started')
@@ -298,10 +307,13 @@ class SkiptroService:
                 break
 
             if not self.player.isPlayingVideo():
-                if self.active_ranges or self.prompted_ranges:
+                if self.active_ranges or self.prompted_ranges or self.auto_skipped_ranges:
                     self.active_ranges.clear()
                     self.prompted_ranges.clear()
+                    self.auto_skipped_ranges.clear()
                 continue
+
+            self._check_seeking_settled()
 
             if self.player.skiptro_data is None:
                 continue
@@ -324,7 +336,9 @@ class SkiptroService:
         if intro:
             start = intro.get('start', 0)
             end = intro.get('end', 0)
-            if start <= current_time < end:
+            if current_time < start:
+                self.auto_skipped_ranges.discard('intro')
+            elif current_time < end:
                 currently_active.add('intro')
 
         credits = data.get('credits')
@@ -333,18 +347,15 @@ class SkiptroService:
             if current_time >= start:
                 currently_active.add('credits')
 
+        new_ranges = currently_active - self.active_ranges
         past_ranges = self.active_ranges - currently_active
         self.prompted_ranges -= past_ranges
         self.active_ranges = currently_active
 
-        if 'intro' in currently_active:
-            set_property('InIntro')
-        else:
-            clear_property('InIntro')
-        if 'credits' in currently_active:
-            set_property('InCredits')
-        else:
-            clear_property('InCredits')
+        for name in new_ranges:
+            set_property('In' + name.capitalize())
+        for name in past_ranges:
+            clear_property('In' + name.capitalize())
 
         for range_type in currently_active:
             if range_type not in self.prompted_ranges:
@@ -352,8 +363,10 @@ class SkiptroService:
                     end = intro.get('end', 0)
                     if ADDON.getSettingBool('auto_skip_intro'):
                         self.prompted_ranges.add('intro')
-                        log(f'Auto-skipping intro, seeking to {end}s')
-                        seek_with_property(self.player, end)
+                        if 'intro' not in self.auto_skipped_ranges:
+                            self.auto_skipped_ranges.add('intro')
+                            log(f'Auto-skipping intro, seeking to {end}s')
+                            seek_with_property(self.player, end)
                     else:
                         self._show_dialog('intro', seek_target=end, window_end=end)
                 elif range_type == 'credits':

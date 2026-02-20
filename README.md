@@ -41,17 +41,17 @@ The add-on sets properties on the Home window that skins can use to show/hide el
 | `Skiptro.HasIntro` | The skip data contains intro timestamps |
 | `Skiptro.InIntro` | Playback is currently within the intro region |
 | `Skiptro.DialogVisible` | The skip dialog is currently on screen |
-| `Skiptro.Skipping` | The add-on has initiated a seek (set before seek, cleared when seek begins processing) |
+| `Skiptro.Skipping` | The add-on has initiated a seek (set before seek, cleared when seek and any post-seek caching have fully settled) |
 
 Use these in skin visibility conditions, e.g. `!String.IsEmpty(Window(Home).Property(Skiptro.InIntro))`.
 
-To hide skin elements during add-on initiated skips (e.g. seekbar, OSD overlays), combine `Skiptro.Skipping` with Kodi's built-in seek conditions as a visibility condition:
+To hide skin elements during add-on initiated skips (e.g. seekbar, OSD overlays), add a visibility condition that checks `Skiptro.Skipping` and `Skiptro.DialogVisible`:
 
 ```
-String.IsEmpty(Window(Home).Property(Skiptro.Skipping)) + !Player.HasPerformedSeek(2) + !Player.Caching
+String.IsEmpty(Window(Home).Property(Skiptro.Skipping)) + String.IsEmpty(Window(Home).Property(Skiptro.DialogVisible))
 ```
 
-Elements using this condition stay hidden for the full seek duration, including post-seek buffering on network sources.
+This can be added as a separate `<visible>` tag alongside existing conditions. The `Skipping` property covers the entire seek lifecycle — from the moment the skip is initiated until `Player.HasPerformedSeek(2)` and `Player.Caching` are both false — so no additional seek/caching conditions are needed.
 
 ## Skinning
 
