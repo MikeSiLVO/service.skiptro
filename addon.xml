@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="service.skiptro" name="Skiptro" version="0.2.0" provider-name="Skiptro">
+<addon id="service.skiptro" name="Skiptro" version="0.3.0" provider-name="Skiptro">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
@@ -7,7 +7,12 @@
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Skip intro/credits button</summary>
         <description lang="en_GB">Displays a skip button during intro and credits sequences. Reads timing data from .skiptro.json files next to video files.</description>
-        <news>v0.2.0
+        <news>v0.3.0
+- Skipping property stays set until seek and buffering are done
+- Auto-skip won't repeat when seeking back into intro
+- Fix property cleanup between files
+
+v0.2.0
 - Auto-skip intro setting
 - Window properties for skin integration
 - Skipping property for hiding skin elements during seeks
