@@ -6,7 +6,9 @@
     <extension point="xbmc.service" library="service.py"/>
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Skip intro/credits button</summary>
+        <summary lang="zh_CN">跳过片头/片尾按钮</summary>
         <description lang="en_GB">Displays a skip button during intro and credits sequences. Reads timing data from .skiptro.json files next to video files.</description>
+        <description lang="zh_CN">在片头和片尾播放时段显示跳过按钮。从视频文件旁的 .skiptro.json 文件中读取时间轴数据。</description>
         <news>v0.3.0
 - Skipping property stays set until seek and buffering are done
 - Auto-skip won't repeat when seeking back into intro
