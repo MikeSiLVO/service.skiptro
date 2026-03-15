@@ -180,6 +180,7 @@ class SkiptroPlayer(xbmc.Player):
         self.current_file = None
 
     def onAVStarted(self):
+        self.skiptro_data = None
         self._load_skiptro_data()
 
     def onPlayBackSeek(self, time, seekOffset):  # noqa: N802,ARG002
@@ -291,6 +292,7 @@ class SkiptroService:
         self.active_ranges = set()
         self.prompted_ranges = set()
         self.auto_skipped_ranges = set()
+        self._last_file = None
 
     def _check_seeking_settled(self):
         global _skiptro_seek_state
@@ -311,7 +313,14 @@ class SkiptroService:
                     self.active_ranges.clear()
                     self.prompted_ranges.clear()
                     self.auto_skipped_ranges.clear()
+                    self._last_file = None
                 continue
+
+            if self.player.current_file != self._last_file:
+                self._last_file = self.player.current_file
+                self.active_ranges.clear()
+                self.prompted_ranges.clear()
+                self.auto_skipped_ranges.clear()
 
             self._check_seeking_settled()
 
