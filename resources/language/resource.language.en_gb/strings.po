@@ -41,8 +41,3 @@ msgstr ""
 msgctxt "#32012"
 msgid "Skip to Stinger"
 msgstr ""
-
-# RunScript dialog
-msgctxt "#32020"
-msgid "Auto-close timeout"
-msgstr ""
