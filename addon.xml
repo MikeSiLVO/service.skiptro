@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="service.skiptro" name="Skiptro" version="0.3.1" provider-name="Skiptro">
+<addon id="service.skiptro" name="Skiptro" version="0.3.2" provider-name="Skiptro">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
@@ -7,7 +7,11 @@
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Skip intro/credits button</summary>
         <description lang="en_GB">Displays a skip button during intro and credits sequences. Reads timing data from .skiptro.json files next to video files.</description>
-        <news>v0.3.1
+        <news>v0.3.2
+- Dialog closes immediately when playback stops
+- Smooth fade animations on dialog open and close
+
+v0.3.1
 - Fix skip data from previous episode carrying over during playlist transitions
 
 v0.3.0
@@ -26,6 +30,8 @@ v0.1.0
 - Reads .skiptro.json files next to video files
 - Configurable auto-dismiss timeout</news>
         <platform>all</platform>
-        <license>MIT</license>
+        <license>GPL-2.0-or-later</license>
+        <source>https://github.com/MikeSiLVO/service.skiptro</source>
+        <forum>https://forum.kodi.tv/showthread.php?tid=384433</forum>
     </extension>
 </addon>
