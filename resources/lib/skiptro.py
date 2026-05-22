@@ -1,6 +1,6 @@
 import json
 import os
-import threading
+import time
 import xbmc
 import xbmcaddon
 import xbmcgui
@@ -37,12 +37,12 @@ def clear_all_properties():
         clear_property(name)
 
 
-_skiptro_seek_state = None  # None -> 'pending' -> 'settling' -> None
+_skip_init_monotonic = None
 
 
 def seek_with_property(player, target):
-    global _skiptro_seek_state
-    _skiptro_seek_state = 'pending'
+    global _skip_init_monotonic
+    _skip_init_monotonic = time.monotonic()
     set_property('Skipping')
     player.seekTime(target)
 
@@ -53,71 +53,23 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
         self.skip_type = None
         self.seek_target = None
         self.stinger_target = None
-        self.autoclose_seconds = 10
-        self.window_end = None
-        self._timer = None
-        self._window_checker = None
-        self._closed = False
+        self.last_action_monotonic = time.monotonic()
+        self.is_open = True
 
-    def set_skip_info(self, skip_type, seek_target=None, stinger_target=None,
-                      autoclose_seconds=10, window_end=None):
+    def close(self):
+        self.is_open = False
+        super().close()
+
+    def set_skip_info(self, skip_type, seek_target=None, stinger_target=None):
         self.skip_type = skip_type
         self.seek_target = seek_target
         self.stinger_target = stinger_target
-        self.autoclose_seconds = autoclose_seconds
-        self.window_end = window_end
-
-    def _start_timer(self):
-        self._cancel_timer()
-        self._timer = threading.Timer(self.autoclose_seconds, self._on_timeout)
-        self._timer.daemon = True
-        self._timer.start()
-
-    def _cancel_timer(self):
-        if self._timer is not None:
-            self._timer.cancel()
-            self._timer = None
-
-    def _on_timeout(self):
-        if not self._closed:
-            log('Dialog auto-closed after timeout')
-            self.close()
-
-    def _start_window_checker(self):
-        if self.window_end is None:
-            return
-        self._cancel_window_checker()
-        self._window_checker = threading.Timer(0.5, self._check_window_end)
-        self._window_checker.daemon = True
-        self._window_checker.start()
-
-    def _cancel_window_checker(self):
-        if self._window_checker is not None:
-            self._window_checker.cancel()
-            self._window_checker = None
-
-    def _check_window_end(self):
-        if self._closed or self.window_end is None:
-            return
-        try:
-            current_time = xbmc.Player().getTime()
-        except RuntimeError:
-            log('Dialog closed - playback stopped')
-            self.close()
-            return
-        if current_time >= self.window_end:
-            log('Dialog closed - playback past skip window')
-            self.close()
-            return
-        self._start_window_checker()
 
     def onInit(self):
         if self.skip_type == 'intro':
             self.setFocusId(101)
         elif self.skip_type == 'credits':
             self.setFocusId(103 if self.stinger_target else 102)
-        self._start_timer()
-        self._start_window_checker()
 
     def onClick(self, controlId):
         player = xbmc.Player()
@@ -144,30 +96,10 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
         self.close()
 
     def onAction(self, action):
-        if self.window_end is not None:
-            try:
-                current_time = xbmc.Player().getTime()
-                if current_time >= self.window_end:
-                    log('Dialog closed - playback past skip window')
-                    self.close()
-                    return
-            except RuntimeError:
-                pass
-
-        # Reset timer on any input to keep dialog open while user interacts
-        self._start_timer()
-
+        self.last_action_monotonic = time.monotonic()
         if action.getId() in (ACTION_PREVIOUS_MENU, ACTION_NAV_BACK):
             log('Dialog dismissed by user')
             self.close()
-
-    def close(self):
-        if self._closed:
-            return
-        self._closed = True
-        self._cancel_timer()
-        self._cancel_window_checker()
-        super().close()
 
 
 class SkiptroPlayer(xbmc.Player):
@@ -180,11 +112,6 @@ class SkiptroPlayer(xbmc.Player):
         self.skiptro_data = None
         self._load_skiptro_data()
 
-    def onPlayBackSeek(self, time, seekOffset):  # noqa: N802,ARG002
-        global _skiptro_seek_state
-        if _skiptro_seek_state == 'pending':
-            _skiptro_seek_state = 'settling'
-
     def onPlayBackStopped(self):
         self._reset()
 
@@ -192,9 +119,9 @@ class SkiptroPlayer(xbmc.Player):
         self._reset()
 
     def _reset(self):
-        global _skiptro_seek_state
+        global _skip_init_monotonic
         log('Playback ended, resetting state')
-        _skiptro_seek_state = None
+        _skip_init_monotonic = None
         self.skiptro_data = None
         self.current_file = None
         clear_all_properties()
@@ -285,9 +212,16 @@ class SkiptroPlayer(xbmc.Player):
             if start < 0:
                 log('Invalid stinger time: negative value', xbmc.LOGWARNING)
                 del self.skiptro_data['stinger']
+            else:
+                credits = self.skiptro_data.get('credits')
+                if credits and start <= credits.get('start', 0):
+                    log('Invalid stinger time: must be after credits start', xbmc.LOGWARNING)
+                    del self.skiptro_data['stinger']
 
 
 class SkiptroService:
+    SKIPPING_MIN = 2.0
+
     def __init__(self):
         self.monitor = xbmc.Monitor()
         self.player = SkiptroPlayer()
@@ -295,13 +229,46 @@ class SkiptroService:
         self.prompted_ranges = set()
         self.auto_skipped_ranges = set()
         self._last_file = None
+        self._dialog = None
+        self._dialog_window_end = None
+        self._dialog_autoclose_seconds = 10
 
-    def _check_seeking_settled(self):
-        global _skiptro_seek_state
-        if _skiptro_seek_state == 'settling' and not xbmc.getCondVisibility(
-                'Player.HasPerformedSeek(2) | Player.Caching'):
-            _skiptro_seek_state = None
-            clear_property('Skipping')
+    def _update_skipping(self, skip_init):
+        global _skip_init_monotonic
+        if skip_init is None:
+            return
+        if time.monotonic() - skip_init < self.SKIPPING_MIN:
+            return
+        if xbmc.getCondVisibility('Player.Caching'):
+            return
+        clear_property('Skipping')
+        _skip_init_monotonic = None
+
+    def _close_dialog(self):
+        if self._dialog is None:
+            return
+        if self._dialog.is_open:
+            self._dialog.close()
+        self._dialog = None
+        self._dialog_window_end = None
+        clear_property('DialogVisible')
+
+    def _update_dialog_lifecycle(self, current_time):
+        if self._dialog is None:
+            return
+        if not self._dialog.is_open:
+            self._dialog = None
+            self._dialog_window_end = None
+            clear_property('DialogVisible')
+            return
+        idle = time.monotonic() - self._dialog.last_action_monotonic
+        if idle >= self._dialog_autoclose_seconds:
+            log('Dialog auto-closed after timeout')
+            self._close_dialog()
+            return
+        if self._dialog_window_end is not None and current_time >= self._dialog_window_end:
+            log('Dialog closed - playback past skip window')
+            self._close_dialog()
 
     def run(self):
         log('Service started')
@@ -311,6 +278,7 @@ class SkiptroService:
                 break
 
             if not self.player.isPlayingVideo():
+                self._close_dialog()
                 if self.active_ranges or self.prompted_ranges or self.auto_skipped_ranges:
                     self.active_ranges.clear()
                     self.prompted_ranges.clear()
@@ -318,15 +286,19 @@ class SkiptroService:
                     self._last_file = None
                 continue
 
-            if self.player.current_file != self._last_file:
-                self._last_file = self.player.current_file
+            data = self.player.skiptro_data
+            current_file = self.player.current_file
+            skip_init = _skip_init_monotonic
+
+            if current_file != self._last_file:
+                self._last_file = current_file
                 self.active_ranges.clear()
                 self.prompted_ranges.clear()
                 self.auto_skipped_ranges.clear()
 
-            self._check_seeking_settled()
+            self._update_skipping(skip_init)
 
-            if self.player.skiptro_data is None:
+            if data is None:
                 continue
 
             try:
@@ -334,14 +306,16 @@ class SkiptroService:
             except RuntimeError:
                 continue
 
-            self._check_skiptro_ranges(current_time)
+            self._update_dialog_lifecycle(current_time)
+            if skip_init is None:
+                self._check_skiptro_ranges(current_time, data)
 
+        self._close_dialog()
         clear_all_properties()
         log('Service stopped')
 
-    def _check_skiptro_ranges(self, current_time):
+    def _check_skiptro_ranges(self, current_time, data):
         currently_active = set()
-        data = self.player.skiptro_data
 
         intro = data.get('intro')
         if intro:
@@ -388,6 +362,7 @@ class SkiptroService:
 
     def _show_dialog(self, skip_type, seek_target=None, stinger_target=None,
                       window_end=None):
+        self._close_dialog()
         self.prompted_ranges.add(skip_type)
 
         autoclose_seconds = ADDON.getSettingInt('autoclose_seconds')
@@ -400,12 +375,13 @@ class SkiptroService:
             'default',
             '1080i'
         )
-        dialog.set_skip_info(skip_type, seek_target, stinger_target,
-                             autoclose_seconds, window_end)
+        dialog.set_skip_info(skip_type, seek_target, stinger_target)
         set_property('DialogVisible')
-        dialog.doModal()
-        clear_property('DialogVisible')
-        del dialog
+        dialog.show()
+
+        self._dialog = dialog
+        self._dialog_autoclose_seconds = autoclose_seconds
+        self._dialog_window_end = window_end
 
 
 def main():
