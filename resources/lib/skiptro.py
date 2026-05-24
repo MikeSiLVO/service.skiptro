@@ -74,24 +74,24 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
     def onClick(self, controlId):
         player = xbmc.Player()
 
-        if controlId == 101 and self.skip_type == 'intro':
-            if self.seek_target is not None:
-                log(f'Skipping intro, seeking to {self.seek_target}s')
-                seek_with_property(player, self.seek_target)
+        try:
+            if controlId == 101 and self.skip_type == 'intro':
+                if self.seek_target is not None:
+                    log(f'Skipping intro, seeking to {self.seek_target}s')
+                    seek_with_property(player, self.seek_target)
 
-        elif controlId == 102 and self.skip_type == 'credits':
-            try:
+            elif controlId == 102 and self.skip_type == 'credits':
                 total_time = player.getTotalTime()
                 seek_to = max(0, total_time - 2)
                 log(f'Skipping credits, seeking to {seek_to}s')
                 seek_with_property(player, seek_to)
-            except RuntimeError:
-                pass
 
-        elif controlId == 103 and self.skip_type == 'credits':
-            if self.stinger_target is not None:
-                log(f'Skipping to stinger at {self.stinger_target}s')
-                seek_with_property(player, self.stinger_target)
+            elif controlId == 103 and self.skip_type == 'credits':
+                if self.stinger_target is not None:
+                    log(f'Skipping to stinger at {self.stinger_target}s')
+                    seek_with_property(player, self.stinger_target)
+        except RuntimeError as e:
+            log(f'Skip failed: {e}', xbmc.LOGWARNING)
 
         self.close()
 
@@ -239,10 +239,11 @@ class SkiptroService:
             return
         if time.monotonic() - skip_init < self.SKIPPING_MIN:
             return
-        if xbmc.getCondVisibility('Player.Caching'):
+        if xbmc.getCondVisibility('Player.HasPerformedSeek(2) | Player.Caching'):
             return
-        clear_property('Skipping')
-        _skip_init_monotonic = None
+        if _skip_init_monotonic == skip_init:
+            clear_property('Skipping')
+            _skip_init_monotonic = None
 
     def _close_dialog(self):
         if self._dialog is None:
@@ -257,9 +258,7 @@ class SkiptroService:
         if self._dialog is None:
             return
         if not self._dialog.is_open:
-            self._dialog = None
-            self._dialog_window_end = None
-            clear_property('DialogVisible')
+            self._close_dialog()
             return
         idle = time.monotonic() - self._dialog.last_action_monotonic
         if idle >= self._dialog_autoclose_seconds:
@@ -307,7 +306,7 @@ class SkiptroService:
                 continue
 
             self._update_dialog_lifecycle(current_time)
-            if skip_init is None:
+            if _skip_init_monotonic is None:
                 self._check_skiptro_ranges(current_time, data)
 
         self._close_dialog()
