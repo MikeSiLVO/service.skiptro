@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="service.skiptro" name="Skiptro" version="0.3.3" provider-name="Skiptro">
+<addon id="service.skiptro" name="Skiptro" version="0.3.4" provider-name="Skiptro">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
@@ -15,7 +15,11 @@
             <icon>icon.png</icon>
             <fanart>fanart.jpg</fanart>
         </assets>
-        <news>v0.3.3
+        <news>v0.3.4
+- Fix errors when clicking skip right as playback stops
+- Fix Skipping property being cleared too early when skips happen back-to-back
+
+v0.3.3
 - Refactor
 - Add icon and fanart
 
