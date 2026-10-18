@@ -359,24 +359,110 @@ class SkiptroService:
                     self._show_dialog('credits', stinger_target=stinger_target)
                 return
 
+    def _estimate_text_width(self, text):
+        """Estimates the pixel width of an UPPERCASE text in the 1080i font."""
+        width = 0
+        for char in text:
+            if ('\u4e00' <= char <= '\u9fff'
+                    or '\u3040' <= char <= '\u30ff'
+                    or '\uac00' <= char <= '\ud7af'):
+                width += 36
+            elif char in 'iIl1.,;:\'|!':
+                width += 10
+            elif char in 'MWmw@':
+                width += 30
+            elif char == ' ':
+                width += 14
+            else:
+                width += 24
+        return width + 80
+
     def _show_dialog(self, skip_type, seek_target=None, stinger_target=None,
-                      window_end=None):
+                     window_end=None):
         self._close_dialog()
         self.prompted_ranges.add(skip_type)
 
         autoclose_seconds = ADDON.getSettingInt('autoclose_seconds')
-
         log(f'Showing {skip_type} dialog (autoclose: {autoclose_seconds}s)')
 
         dialog = SkiptroDialog(
-            'service.skiptro-SkipDialog.xml',
-            ADDON_PATH,
-            'default',
-            '1080i'
+            'service.skiptro-SkipDialog.xml', ADDON_PATH, 'default', '1080i'
         )
         dialog.set_skip_info(skip_type, seek_target, stinger_target)
         set_property('DialogVisible')
         dialog.show()
+
+        # --- Dimension and position buttons ---
+        STRING_IDS = {101: 32010, 102: 32011, 103: 32012}
+
+        try:
+            win_w = dialog.getWidth()
+            win_h = dialog.getHeight()
+            if win_w < 100:
+                win_w = 1920
+            if win_h < 100:
+                win_h = 1080
+        except Exception as e:
+            log(f'getWidth/getHeight failed: {e}', xbmc.LOGWARNING)
+            win_w, win_h = 1920, 1080
+        log(f'Dialog size: {win_w}x{win_h}')
+
+        # Visible buttons depending on the mode
+        if skip_type == 'intro':
+            visible_ids = [101]
+        elif stinger_target is not None:
+            visible_ids = [103, 102]   # 103 left, 102 right
+        else:
+            visible_ids = [102]
+
+        # Desired widths based on text length
+        widths = {}
+        for cid in visible_ids:
+            try:
+                text = ADDON.getLocalizedString(STRING_IDS[cid]).upper()
+                widths[cid] = self._estimate_text_width(text)
+            except Exception:
+                widths[cid] = 280
+
+        MARGIN = 40
+        GAP = 20
+        BUTTON_Y = win_h - 180   # ~120px from the bottom edge
+
+        if len(visible_ids) == 1:
+            cid = visible_ids[0]
+            max_w = win_w - 2 * MARGIN
+            width = max(240, min(widths[cid], max_w))
+            x = win_w - MARGIN - width
+            try:
+                ctrl = dialog.getControl(cid)
+                if ctrl:
+                    ctrl.setPosition(x, BUTTON_Y)
+                    ctrl.setWidth(width)
+                    log(f'Control {cid}: pos=({x},{BUTTON_Y}) w={width}')
+                else:
+                    log(f'Control {cid} not found', xbmc.LOGWARNING)
+            except Exception as e:
+                log(f'Failed to position {cid}: {e}', xbmc.LOGWARNING)
+        else:
+            # Credits + Stinger: both visible -> side by side
+            max_total = win_w - 2 * MARGIN - GAP
+            total = widths[103] + widths[102]
+            if total > max_total:
+                scale = max_total / total
+                widths[103] = int(widths[103] * scale)
+                widths[102] = int(widths[102] * scale)
+            x_left = MARGIN
+            x_right = MARGIN + widths[103] + GAP
+            for cid, x in [(103, x_left), (102, x_right)]:
+                try:
+                    ctrl = dialog.getControl(cid)
+                    if ctrl:
+                        ctrl.setPosition(x, BUTTON_Y)
+                        ctrl.setWidth(widths[cid])
+                        log(f'Control {cid}: pos=({x},{BUTTON_Y}) w={widths[cid]}')
+                except Exception as e:
+                    log(f'Failed to position {cid}: {e}', xbmc.LOGWARNING)
+        # --- End ---
 
         self._dialog = dialog
         self._dialog_autoclose_seconds = autoclose_seconds
