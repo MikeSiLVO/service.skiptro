@@ -65,12 +65,6 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
         self.seek_target = seek_target
         self.stinger_target = stinger_target
 
-    def onInit(self):
-        if self.skip_type == 'intro':
-            self.setFocusId(101)
-        elif self.skip_type == 'credits':
-            self.setFocusId(103 if self.stinger_target else 102)
-
     def onClick(self, controlId):
         player = xbmc.Player()
 
