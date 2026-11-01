@@ -1,0 +1,23 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to run the log check against'
+        required: true
+        type: string
+
+jobs:
+  triage:
+    if: github.repository == 'MikeSiLVO/service.skiptro'
+    permissions:
+      issues: write
+    uses: MikeSiLVO/workflows/.github/workflows/issue-triage.yml@v2.4.1
+    with:
+      issue_number: ${{ github.event.inputs.issue_number }}
+    secrets: inherit

@@ -1,0 +1,18 @@
+name: Sync addon metadata translations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**addon.xml'
+      - '**resource.language.**strings.po'
+  workflow_dispatch:
+
+jobs:
+  sync-translations:
+    if: github.repository == 'MikeSiLVO/service.skiptro'
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: MikeSiLVO/workflows/.github/workflows/sync-addon-metadata-translations.yml@v2.4.1
+    secrets: inherit

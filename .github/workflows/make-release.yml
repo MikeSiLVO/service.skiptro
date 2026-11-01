@@ -5,59 +5,10 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-
 jobs:
   release:
-    name: Make Release
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Add-on
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install libxml2-utils xmlstarlet zip
-
-      - name: Get addon info
-        id: addon-info
-        run: |
-          version=$(xmlstarlet sel -t -v 'string(/addon/@version)' addon.xml)
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-          changelog=$(xmlstarlet sel -t -v '//news' addon.xml)
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$changelog" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-          if [[ $version == *~alpha* || $version == *~beta* ]]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Zip
-        id: zip
-        run: |
-          rm -rf .git .github .gitignore .gitattributes
-          rm -rf .claude .vscode .idea
-          rm -rf .pylintrc pyrightconfig.json ruff.toml pyproject.toml
-          rm -rf typings tests docs
-          rm -f README.md CHANGELOG.md
-          cd ..
-          filename=${{ github.event.repository.name }}-${{ steps.addon-info.outputs.version }}.zip
-          zip -r $filename ${{ github.event.repository.name }}
-          echo "filename=$filename" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: v${{ steps.addon-info.outputs.version }}
-          body: ${{ steps.addon-info.outputs.changelog }}
-          prerelease: ${{ steps.addon-info.outputs.prerelease }}
-          files: ../${{ steps.zip.outputs.filename }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    if: github.repository == 'MikeSiLVO/service.skiptro'
+    permissions:
+      contents: write
+    uses: MikeSiLVO/workflows/.github/workflows/make-release.yml@v2.4.1
+    secrets: inherit

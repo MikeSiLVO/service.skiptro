@@ -1,0 +1,14 @@
+name: Close Stale Issues
+
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  stale:
+    if: github.repository == 'MikeSiLVO/service.skiptro'
+    permissions:
+      issues: write
+    uses: MikeSiLVO/workflows/.github/workflows/stale-issues.yml@v2.4.1
+    secrets: inherit
