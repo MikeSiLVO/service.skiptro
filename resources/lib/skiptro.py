@@ -11,8 +11,6 @@ ADDON = xbmcaddon.Addon()
 ADDON_ID = ADDON.getAddonInfo('id')
 ADDON_PATH = ADDON.getAddonInfo('path')
 
-ACTION_PREVIOUS_MENU = 10
-ACTION_NAV_BACK = 92
 STREAMS = ('http://', 'https://', 'plugin://', 'pvr://')
 
 
@@ -104,7 +102,7 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
     def onAction(self, action):
         """Restart the idle timer on any input, and close on back or previous menu."""
         self.last_action_monotonic = time.monotonic()
-        if action.getId() in (ACTION_PREVIOUS_MENU, ACTION_NAV_BACK):
+        if action.getId() in (xbmcgui.ACTION_PREVIOUS_MENU, xbmcgui.ACTION_NAV_BACK):
             log('Dialog dismissed by user')
             self.close()
 
@@ -128,12 +126,9 @@ class SkiptroPlayer(xbmc.Player):
         self.notified_unreadable = False
 
     def onAVStarted(self):
-        """Load the skip data for a video that just started, or clear the last video's data."""
-        self.skiptro_data = None
-        if self.isPlayingVideo():
-            self._load_skiptro_data()
-        else:
-            clear_all_properties()
+        """Load skip data and set its properties for a video that just started, or clear them."""
+        self.skiptro_data = self._load_skiptro_data() if self.isPlayingVideo() else None
+        self._update_data_properties()
 
     def onPlayBackStopped(self):
         """Clear the skip state when the user stops playback."""
@@ -153,19 +148,18 @@ class SkiptroPlayer(xbmc.Player):
         clear_all_properties()
 
     def _load_skiptro_data(self):
-        """Load and check the sidecar beside a non-stream file, then set the data properties."""
+        """Load and check a non-stream file's sidecar, recording the file; None when unusable."""
         folder = xbmc.getInfoLabel('Player.Folderpath')
         filename = xbmc.getInfoLabel('Player.Filename')
 
         if not folder or not filename:
             log('Could not get folder/filename from InfoLabels', xbmc.LOGWARNING)
-            return
+            return None
 
         self.current_file = folder + filename
         if folder.startswith(STREAMS):
             log('Stream playback, no skiptro lookup')
-            clear_all_properties()
-            return
+            return None
 
         base, _ = os.path.splitext(filename)
         skiptro_path = folder + base + '.skiptro.json'
@@ -174,29 +168,23 @@ class SkiptroPlayer(xbmc.Player):
 
         if not xbmcvfs.exists(skiptro_path):
             log('No skiptro file found')
-            self.skiptro_data = None
-            clear_all_properties()
-            return
+            return None
 
         try:
             with xbmcvfs.File(skiptro_path, 'r') as f:
                 content = f.read()
             if not content:
                 self._report_empty_read(skiptro_path)
-                clear_all_properties()
-                return
-            self.skiptro_data = json.loads(content)
-            log(f'Loaded skiptro data: {self.skiptro_data}')
-            self._validate_skiptro_data()
-            self._update_data_properties()
+                return None
+            data = json.loads(content)
+            log(f'Loaded skiptro data: {data}')
+            self._validate_skiptro_data(data)
+            return data
         except json.JSONDecodeError as e:
             log(f'Invalid JSON in skiptro file: {e}', xbmc.LOGWARNING)
-            self.skiptro_data = None
-            clear_all_properties()
         except Exception as e:
             log(f'Error reading skiptro file: {e}', xbmc.LOGWARNING)
-            self.skiptro_data = None
-            clear_all_properties()
+        return None
 
     def _report_empty_read(self, path):
         """Report an empty sidecar read in the log, notifying once per run when it is unreadable."""
@@ -218,58 +206,48 @@ class SkiptroPlayer(xbmc.Player):
             clear_all_properties()
             return
         set_property('HasData')
-        if 'intro' in self.skiptro_data:
-            set_property('HasIntro')
-        else:
-            clear_property('HasIntro')
-        if 'credits' in self.skiptro_data:
-            set_property('HasCredits')
-        else:
-            clear_property('HasCredits')
-        if 'stinger' in self.skiptro_data:
-            set_property('HasStinger')
-        else:
-            clear_property('HasStinger')
+        for name in ('intro', 'credits', 'stinger'):
+            if name in self.skiptro_data:
+                set_property('Has' + name.capitalize())
+            else:
+                clear_property('Has' + name.capitalize())
 
-    def _validate_skiptro_data(self):
-        """Drop each range whose times are negative or out of order, logging why."""
-        if not self.skiptro_data:
-            return
-
-        intro = self.skiptro_data.get('intro')
+    def _validate_skiptro_data(self, data):
+        """Validate each range, dropping any with negative or out-of-order times, logging why."""
+        intro = data.get('intro')
         if intro:
             start = intro.get('start', 0)
             end = intro.get('end', 0)
             if start < 0 or end < 0:
                 log('Invalid intro times: negative values', xbmc.LOGWARNING)
-                del self.skiptro_data['intro']
+                del data['intro']
             elif end <= start:
                 log('Invalid intro times: end must be after start', xbmc.LOGWARNING)
-                del self.skiptro_data['intro']
+                del data['intro']
 
-        credits = self.skiptro_data.get('credits')
+        credits = data.get('credits')
         if credits:
             start = credits.get('start', 0)
             if start < 0:
                 log('Invalid credits time: negative value', xbmc.LOGWARNING)
-                del self.skiptro_data['credits']
+                del data['credits']
             else:
-                intro = self.skiptro_data.get('intro')
+                intro = data.get('intro')
                 if intro and start < intro.get('end', 0):
                     log('Invalid credits time: overlaps intro', xbmc.LOGWARNING)
-                    del self.skiptro_data['credits']
+                    del data['credits']
 
-        stinger = self.skiptro_data.get('stinger')
+        stinger = data.get('stinger')
         if stinger:
             start = stinger.get('start', 0)
             if start < 0:
                 log('Invalid stinger time: negative value', xbmc.LOGWARNING)
-                del self.skiptro_data['stinger']
+                del data['stinger']
             else:
-                credits = self.skiptro_data.get('credits')
+                credits = data.get('credits')
                 if credits and start <= credits.get('start', 0):
                     log('Invalid stinger time: must be after credits start', xbmc.LOGWARNING)
-                    del self.skiptro_data['stinger']
+                    del data['stinger']
 
 
 class SkiptroService:
@@ -287,6 +265,12 @@ class SkiptroService:
         self._dialog = None
         self._dialog_window_end = None
         self._dialog_autoclose_seconds = 10
+
+    def _clear_ranges(self):
+        """Clear the active, prompted and auto-skipped range sets."""
+        self.active_ranges.clear()
+        self.prompted_ranges.clear()
+        self.auto_skipped_ranges.clear()
 
     def _update_skipping(self, skip_init):
         """Clear Skiptro.Skipping once this skip is old enough and seeking and caching are done."""
@@ -338,9 +322,7 @@ class SkiptroService:
             if not self.player.isPlayingVideo():
                 self._close_dialog()
                 if self.active_ranges or self.prompted_ranges or self.auto_skipped_ranges:
-                    self.active_ranges.clear()
-                    self.prompted_ranges.clear()
-                    self.auto_skipped_ranges.clear()
+                    self._clear_ranges()
                     self._last_file = None
                 continue
 
@@ -350,9 +332,7 @@ class SkiptroService:
 
             if current_file != self._last_file:
                 self._last_file = current_file
-                self.active_ranges.clear()
-                self.prompted_ranges.clear()
-                self.auto_skipped_ranges.clear()
+                self._clear_ranges()
 
             self._update_skipping(skip_init)
 
