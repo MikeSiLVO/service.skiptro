@@ -12,6 +12,7 @@ ADDON_PATH = ADDON.getAddonInfo('path')
 
 ACTION_PREVIOUS_MENU = 10
 ACTION_NAV_BACK = 92
+STREAMS = ('http://', 'https://', 'plugin://', 'pvr://')
 
 
 def log(message, level=xbmc.LOGDEBUG):
@@ -106,8 +107,12 @@ class SkiptroPlayer(xbmc.Player):
         self.notified_unreadable = False
 
     def onAVStarted(self):
+        """Load the skip data for a video that just started, or clear the last video's data."""
         self.skiptro_data = None
-        self._load_skiptro_data()
+        if self.isPlayingVideo():
+            self._load_skiptro_data()
+        else:
+            clear_all_properties()
 
     def onPlayBackStopped(self):
         self._reset()
@@ -124,7 +129,7 @@ class SkiptroPlayer(xbmc.Player):
         clear_all_properties()
 
     def _load_skiptro_data(self):
-        """Load and check the sidecar next to the playing file, then set the data properties."""
+        """Load and check the sidecar beside a non-stream file, then set the data properties."""
         folder = xbmc.getInfoLabel('Player.Folderpath')
         filename = xbmc.getInfoLabel('Player.Filename')
 
@@ -133,6 +138,11 @@ class SkiptroPlayer(xbmc.Player):
             return
 
         self.current_file = folder + filename
+        if folder.startswith(STREAMS):
+            log('Stream playback, no skiptro lookup')
+            clear_all_properties()
+            return
+
         base, _ = os.path.splitext(filename)
         skiptro_path = folder + base + '.skiptro.json'
 
