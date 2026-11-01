@@ -24,8 +24,8 @@
                 <align>center</align>
                 <textcolor>FFFFFFFF</textcolor>
                 <focusedcolor>FFFFFFFF</focusedcolor>
-                <texturefocus colordiffuse="FF3399FF" border="4">white.png</texturefocus>
-                <texturenofocus colordiffuse="99000000" border="4">white.png</texturenofocus>
+                <texturefocus colordiffuse="FF3399FF" border="16">skiptro-button.png</texturefocus>
+                <texturenofocus colordiffuse="99000000" border="16">skiptro-button.png</texturenofocus>
             </control>
             <control type="button" id="103">
                 <description>Skip to Stinger Button</description>
@@ -38,8 +38,8 @@
                 <align>center</align>
                 <textcolor>FFFFFFFF</textcolor>
                 <focusedcolor>FFFFFFFF</focusedcolor>
-                <texturefocus colordiffuse="FFFF8800" border="4">white.png</texturefocus>
-                <texturenofocus colordiffuse="99000000" border="4">white.png</texturenofocus>
+                <texturefocus colordiffuse="FFFF8800" border="16">skiptro-button.png</texturefocus>
+                <texturenofocus colordiffuse="99000000" border="16">skiptro-button.png</texturenofocus>
             </control>
             <control type="button" id="102">
                 <description>Skip Credits Button</description>
@@ -52,8 +52,8 @@
                 <align>center</align>
                 <textcolor>FFFFFFFF</textcolor>
                 <focusedcolor>FFFFFFFF</focusedcolor>
-                <texturefocus colordiffuse="FF3399FF" border="4">white.png</texturefocus>
-                <texturenofocus colordiffuse="99000000" border="4">white.png</texturenofocus>
+                <texturefocus colordiffuse="FF3399FF" border="16">skiptro-button.png</texturefocus>
+                <texturenofocus colordiffuse="99000000" border="16">skiptro-button.png</texturenofocus>
             </control>
         </control>
     </controls>
