@@ -97,10 +97,13 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
 
 
 class SkiptroPlayer(xbmc.Player):
+    """Player that loads each video's skip data and clears it when playback stops or ends."""
+
     def __init__(self):
         super().__init__()
         self.skiptro_data = None
         self.current_file = None
+        self.notified_unreadable = False
 
     def onAVStarted(self):
         self.skiptro_data = None
@@ -121,6 +124,7 @@ class SkiptroPlayer(xbmc.Player):
         clear_all_properties()
 
     def _load_skiptro_data(self):
+        """Load and check the sidecar next to the playing file, then set the data properties."""
         folder = xbmc.getInfoLabel('Player.Folderpath')
         filename = xbmc.getInfoLabel('Player.Filename')
 
@@ -142,7 +146,12 @@ class SkiptroPlayer(xbmc.Player):
 
         try:
             with xbmcvfs.File(skiptro_path, 'r') as f:
-                self.skiptro_data = json.loads(f.read())
+                content = f.read()
+            if not content:
+                self._report_empty_read(skiptro_path)
+                clear_all_properties()
+                return
+            self.skiptro_data = json.loads(content)
             log(f'Loaded skiptro data: {self.skiptro_data}')
             self._validate_skiptro_data()
             self._update_data_properties()
@@ -154,6 +163,20 @@ class SkiptroPlayer(xbmc.Player):
             log(f'Error reading skiptro file: {e}', xbmc.LOGWARNING)
             self.skiptro_data = None
             clear_all_properties()
+
+    def _report_empty_read(self, path):
+        """Report an empty sidecar read in the log, notifying once per run when it is unreadable."""
+        if not xbmcvfs.Stat(path).st_size():
+            log(f'Skiptro file is empty: {path}', xbmc.LOGWARNING)
+            return
+        android = xbmc.getCondVisibility('System.Platform.Android')
+        fix = 'grant Kodi "All files access"' if android else 'check the file permissions'
+        log(f'Skiptro file exists but cannot be read, {fix}: {path}', xbmc.LOGWARNING)
+        if not self.notified_unreadable:
+            self.notified_unreadable = True
+            message = ADDON.getLocalizedString(32021 if android else 32020)
+            xbmcgui.Dialog().notification(ADDON.getAddonInfo('name'), message,
+                                          xbmcgui.NOTIFICATION_WARNING, 10000)
 
     def _update_data_properties(self):
         if not self.skiptro_data:

@@ -41,3 +41,12 @@ msgstr ""
 msgctxt "#32012"
 msgid "Skip to Stinger"
 msgstr ""
+
+# Notifications
+msgctxt "#32020"
+msgid "Can't read skip data. Check the file permissions."
+msgstr ""
+
+msgctxt "#32021"
+msgid "Can't read skip data. Turn on \"All files access\" for Kodi in Android settings."
+msgstr ""
