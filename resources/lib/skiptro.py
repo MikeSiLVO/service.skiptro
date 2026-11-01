@@ -97,6 +97,15 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
             self.close()
 
 
+class SkiptroMonitor(xbmc.Monitor):
+    """Monitor that keeps the settings current after each save."""
+
+    def onSettingsChanged(self):
+        """Swap in a fresh Addon so later reads see the saved settings."""
+        global ADDON
+        ADDON = xbmcaddon.Addon()
+
+
 class SkiptroPlayer(xbmc.Player):
     """Player that loads each video's skip data and clears it when playback stops or ends."""
 
@@ -247,10 +256,12 @@ class SkiptroPlayer(xbmc.Player):
 
 
 class SkiptroService:
+    """Background loop that matches playback time to the skip ranges."""
+
     SKIPPING_MIN = 2.0
 
     def __init__(self):
-        self.monitor = xbmc.Monitor()
+        self.monitor = SkiptroMonitor()
         self.player = SkiptroPlayer()
         self.active_ranges = set()
         self.prompted_ranges = set()
