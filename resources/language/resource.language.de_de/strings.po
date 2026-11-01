@@ -16,6 +16,14 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgctxt "Addon Summary"
+msgid "Skip intro/credits button"
+msgstr "Schaltfläche zum Überspringen von Intro/Abspann"
+
+msgctxt "Addon Description"
+msgid "Displays a skip button during intro and credits sequences. Reads timing data from .skiptro.json files next to video files."
+msgstr "Zeigt während Intro und Abspann eine Schaltfläche zum Überspringen an. Liest Zeitdaten aus .skiptro.json-Dateien neben den Videodateien."
+
 # Settings
 msgctxt "#32001"
 msgid "Dialog"
@@ -41,3 +49,11 @@ msgstr "Abspann überspringen"
 msgctxt "#32012"
 msgid "Skip to Stinger"
 msgstr "Zur Stinger-Szene springen"
+
+msgctxt "#32020"
+msgid "Can't read skip data. Check the file permissions."
+msgstr "Daten zum Überspringen können nicht gelesen werden. Bitte die Dateiberechtigungen prüfen."
+
+msgctxt "#32021"
+msgid "Can't read skip data. Turn on \"All files access\" for Kodi in Android settings."
+msgstr "Daten zum Überspringen können nicht gelesen werden. Bitte in den Android-Einstellungen „Zugriff auf alle Dateien“ für Kodi aktivieren."
