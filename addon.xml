@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="service.skiptro" name="Skiptro" version="0.3.4" provider-name="Skiptro">
+<addon id="service.skiptro" name="Skiptro" version="0.3.5" provider-name="Skiptro">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
@@ -13,11 +13,10 @@
             <icon>icon.png</icon>
             <fanart>fanart.jpg</fanart>
         </assets>
-        <news>v0.3.4
-- Initial Kodi repo release
-- Skip intro button during playback
-- Reads .skiptro.json files next to video files
-- Configurable auto-dismiss timeout</news>
+        <news>v0.3.5
+- Notification when a .skiptro.json file can't be read, pointing Android users to "All files access"
+- Rounded skip buttons
+- Translations for all Kodi languages</news>
         <summary lang="af_ZA">Knoppie om intro/aftiteling oor te slaan</summary>
         <summary lang="am_ET">የመግቢያ/ክሬዲቶች መዝለያ አዝራር</summary>
         <summary lang="ar_SA">زر لتخطي المقدمة/شارة النهاية</summary>
