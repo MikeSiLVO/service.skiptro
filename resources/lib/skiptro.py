@@ -1,3 +1,4 @@
+"""Skip button service: reads each video's .skiptro.json and shows or runs the skip."""
 import json
 import os
 import time
@@ -16,6 +17,7 @@ STREAMS = ('http://', 'https://', 'plugin://', 'pvr://')
 
 
 def log(message, level=xbmc.LOGDEBUG):
+    """Log to kodi.log under the add-on id, at debug level by default."""
     xbmc.log(f'[{ADDON_ID}] {message}', level)
 
 
@@ -26,14 +28,17 @@ ALL_PROPERTIES = ('HasData', 'HasIntro', 'HasCredits', 'HasStinger',
 
 
 def set_property(name, value='true'):
+    """Set a Skiptro.* property on the Home window."""
     HOME.setProperty(PROP_PREFIX + name, value)
 
 
 def clear_property(name):
+    """Clear a Skiptro.* property on the Home window."""
     HOME.clearProperty(PROP_PREFIX + name)
 
 
 def clear_all_properties():
+    """Clear every Skiptro.* property the add-on sets."""
     for name in ALL_PROPERTIES:
         clear_property(name)
 
@@ -42,6 +47,7 @@ _skip_init_monotonic = None
 
 
 def seek_with_property(player, target):
+    """Seek with Skiptro.Skipping set and the skip start time recorded."""
     global _skip_init_monotonic
     _skip_init_monotonic = time.monotonic()
     set_property('Skipping')
@@ -49,6 +55,8 @@ def seek_with_property(player, target):
 
 
 class SkiptroDialog(xbmcgui.WindowXMLDialog):
+    """Non-modal skip dialog with intro, credits and stinger buttons."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.skip_type = None
@@ -58,15 +66,18 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
         self.is_open = True
 
     def close(self):
+        """Close the dialog and mark it closed for the service loop."""
         self.is_open = False
         super().close()
 
     def set_skip_info(self, skip_type, seek_target=None, stinger_target=None):
+        """Set the range type and the seek targets the buttons use."""
         self.skip_type = skip_type
         self.seek_target = seek_target
         self.stinger_target = stinger_target
 
     def onClick(self, controlId):
+        """Run the clicked button's skip when it matches the range, then close."""
         player = xbmc.Player()
 
         try:
@@ -91,6 +102,7 @@ class SkiptroDialog(xbmcgui.WindowXMLDialog):
         self.close()
 
     def onAction(self, action):
+        """Restart the idle timer on any input, and close on back or previous menu."""
         self.last_action_monotonic = time.monotonic()
         if action.getId() in (ACTION_PREVIOUS_MENU, ACTION_NAV_BACK):
             log('Dialog dismissed by user')
@@ -124,12 +136,15 @@ class SkiptroPlayer(xbmc.Player):
             clear_all_properties()
 
     def onPlayBackStopped(self):
+        """Clear the skip state when the user stops playback."""
         self._reset()
 
     def onPlayBackEnded(self):
+        """Clear the skip state when playback ends, a playlist advance included."""
         self._reset()
 
     def _reset(self):
+        """Reset the skip data, the playing file, any pending skip and every property."""
         global _skip_init_monotonic
         log('Playback ended, resetting state')
         _skip_init_monotonic = None
@@ -198,6 +213,7 @@ class SkiptroPlayer(xbmc.Player):
                                           xbmcgui.NOTIFICATION_WARNING, 10000)
 
     def _update_data_properties(self):
+        """Update HasData and Has* range properties from loaded data, or clear every property."""
         if not self.skiptro_data:
             clear_all_properties()
             return
@@ -216,6 +232,7 @@ class SkiptroPlayer(xbmc.Player):
             clear_property('HasStinger')
 
     def _validate_skiptro_data(self):
+        """Drop each range whose times are negative or out of order, logging why."""
         if not self.skiptro_data:
             return
 
@@ -272,6 +289,7 @@ class SkiptroService:
         self._dialog_autoclose_seconds = 10
 
     def _update_skipping(self, skip_init):
+        """Clear Skiptro.Skipping once this skip is old enough and seeking and caching are done."""
         global _skip_init_monotonic
         if skip_init is None:
             return
@@ -284,6 +302,7 @@ class SkiptroService:
             _skip_init_monotonic = None
 
     def _close_dialog(self):
+        """Close the dialog if one is up, forget it and clear DialogVisible."""
         if self._dialog is None:
             return
         if self._dialog.is_open:
@@ -293,6 +312,7 @@ class SkiptroService:
         clear_property('DialogVisible')
 
     def _update_dialog_lifecycle(self, current_time):
+        """Close the dialog once the user closed it, it sat idle too long, or playback passed it."""
         if self._dialog is None:
             return
         if not self._dialog.is_open:
@@ -308,6 +328,7 @@ class SkiptroService:
             self._close_dialog()
 
     def run(self):
+        """Run the half-second playback loop until Kodi exits, then clear every property."""
         log('Service started')
 
         while not self.monitor.abortRequested():
@@ -352,6 +373,7 @@ class SkiptroService:
         log('Service stopped')
 
     def _check_skiptro_ranges(self, current_time, data):
+        """Check the ranges at the playback time, set In* properties, prompt or auto-skip one."""
         currently_active = set()
 
         intro = data.get('intro')
@@ -399,6 +421,7 @@ class SkiptroService:
 
     def _show_dialog(self, skip_type, seek_target=None, stinger_target=None,
                       window_end=None):
+        """Show the skip dialog for a range, marking it prompted and closing any open one first."""
         self._close_dialog()
         self.prompted_ranges.add(skip_type)
 
@@ -422,4 +445,5 @@ class SkiptroService:
 
 
 def main():
+    """Run the Skiptro service until Kodi exits."""
     SkiptroService().run()
