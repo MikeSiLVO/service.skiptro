@@ -51,7 +51,7 @@ To hide skin elements during add-on initiated skips (e.g. seekbar, OSD overlays)
 String.IsEmpty(Window(Home).Property(Skiptro.Skipping)) + String.IsEmpty(Window(Home).Property(Skiptro.DialogVisible))
 ```
 
-This can be added as a separate `<visible>` tag alongside existing conditions. The `Skipping` property covers the entire seek lifecycle — from the moment the skip is initiated until `Player.HasPerformedSeek(2)` and `Player.Caching` are both false — so no additional seek/caching conditions are needed.
+This can be added as a separate `<visible>` tag alongside existing conditions. The `Skipping` property covers the entire seek lifecycle, from the moment the skip is initiated until `Player.HasPerformedSeek(2)` and `Player.Caching` are both false, so no additional seek/caching conditions are needed.
 
 ## Skinning
 
@@ -69,6 +69,21 @@ The dialog uses these control IDs:
 |---------|---------|-------------|
 | Automatically skip intros | Off | Skip intros without showing a dialog |
 | Auto-close timeout | 10 seconds | How long the skip button stays on screen before dismissing |
+
+## Troubleshooting
+
+### No skip button on Android
+
+Android 11 and later block Kodi from reading `.skiptro.json` files until Kodi has "All files access". The add-on shows a notification the first time it can't read one.
+
+Turn it on in Android settings under Apps > Special app access > All files access > Kodi. Many Android TV builds hide that screen; run these from a computer with adb instead:
+
+```
+adb shell appops set org.xbmc.kodi MANAGE_EXTERNAL_STORAGE allow
+adb shell am force-stop org.xbmc.kodi
+```
+
+Then start Kodi again.
 
 ## Requirements
 
